@@ -1,0 +1,51 @@
+# SwiftFormat configuration for CopyCopy
+
+# Self
+--self insert
+--selfrequired
+
+# Imports
+--importgrouping testable-bottom
+--extensionacl on-declarations
+
+# Indentation
+--indent 4
+--indentcase false
+--ifdef no-indent
+--xcodeindentation enabled
+
+# Line breaks
+--linebreaks lf
+--maxwidth 120
+
+# Whitespace
+--trimwhitespace always
+--emptybraces no-space
+--nospaceoperators ...,..<
+--ranges no-space
+--someAny true
+
+# Wrapping
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--closingparen same-line
+
+# Organization
+--organizetypes class,struct,enum,extension
+--extensionmark "MARK: - %t + %p"
+--marktypes always
+--markextensions always
+--structthreshold 0
+--enumthreshold 0
+
+# Swift version
+--swiftversion 5.10
+
+# Other
+--stripunusedargs closure-only
+--header ignore
+--allman false
+
+# Exclusions
+--exclude .build,.swiftpm,DerivedData,dist

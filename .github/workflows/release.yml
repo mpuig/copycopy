@@ -1,0 +1,77 @@
+name: Release macOS App
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g., v1.0.0)'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
+
+      - name: Build release
+        run: |
+          swift build -c release
+
+      - name: Package app bundle
+        id: package
+        run: |
+          set -euo pipefail
+
+          # Determine version tag
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            TAG="${{ github.event.release.tag_name }}"
+          elif [[ -n "${{ github.event.inputs.tag }}" ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="dev-$(date +%Y%m%d-%H%M%S)"
+          fi
+
+          echo "Building version: $TAG"
+
+          # Run build script
+          ./build.sh
+
+          # Create zip
+          ASSET="CopyCopy-${TAG}-macos.zip"
+          cd dist
+          zip -r "../$ASSET" CopyCopy.app
+          cd ..
+
+          # Create checksum
+          shasum -a 256 "$ASSET" > "$ASSET.sha256"
+
+          echo "asset=$ASSET" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release assets
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ASSET="${{ steps.package.outputs.asset }}"
+          TAG="${{ github.event.release.tag_name }}"
+          gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --clobber
+
+      - name: Upload workflow artifact (manual runs)
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CopyCopy-macos
+          path: |
+            ${{ steps.package.outputs.asset }}
+            ${{ steps.package.outputs.asset }}.sha256
