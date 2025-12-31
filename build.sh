@@ -8,12 +8,32 @@ cd "$ROOT_DIR"
 
 source "$ROOT_DIR/version.env"
 
-# Build release binary using Swift Package Manager
-swift build -c release
+# Build universal (arm64 + x86_64) using SwiftPM cross-compilation.
+MIN_VER="${MIN_SYSTEM_VERSION:-14.0}"
+ARM_TRIPLE="arm64-apple-macosx${MIN_VER}"
+X64_TRIPLE="x86_64-apple-macosx${MIN_VER}"
 
-# Get the binary path
-BUILD_DIR="$(swift build -c release --show-bin-path)"
-BIN_PATH="$BUILD_DIR/CopyCopy"
+SCRATCH="$ROOT_DIR/.build"
+
+# Keep build caches inside the repo (helps in sandboxed environments).
+export CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.build/clang-module-cache"
+mkdir -p "$CLANG_MODULE_CACHE_PATH"
+SWIFTPM_COMMON_ARGS=(--disable-sandbox)
+
+swift build "${SWIFTPM_COMMON_ARGS[@]}" -c release --triple "$ARM_TRIPLE" --scratch-path "$SCRATCH"
+swift build "${SWIFTPM_COMMON_ARGS[@]}" -c release --triple "$X64_TRIPLE" --scratch-path "$SCRATCH"
+
+ARM_BUILD_DIR="$(swift build "${SWIFTPM_COMMON_ARGS[@]}" -c release --triple "$ARM_TRIPLE" --scratch-path "$SCRATCH" --show-bin-path)"
+X64_BUILD_DIR="$(swift build "${SWIFTPM_COMMON_ARGS[@]}" -c release --triple "$X64_TRIPLE" --scratch-path "$SCRATCH" --show-bin-path)"
+
+ARM_BIN_PATH="$ARM_BUILD_DIR/CopyCopy"
+X64_BIN_PATH="$X64_BUILD_DIR/CopyCopy"
+
+UNIVERSAL_DIR="$ROOT_DIR/.build/universal"
+mkdir -p "$UNIVERSAL_DIR"
+UNIVERSAL_BIN="$UNIVERSAL_DIR/CopyCopy"
+
+lipo -create "$ARM_BIN_PATH" "$X64_BIN_PATH" -output "$UNIVERSAL_BIN"
 
 # Create app bundle
 APP_DIR="$ROOT_DIR/dist/CopyCopy.app"
@@ -22,10 +42,17 @@ mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 mkdir -p "$APP_DIR/Contents/Frameworks"
 
-cp "$BIN_PATH" "$APP_DIR/Contents/MacOS/CopyCopy"
+cp "$UNIVERSAL_BIN" "$APP_DIR/Contents/MacOS/CopyCopy"
 
-# Copy Sparkle framework
-SPARKLE_SRC="$BUILD_DIR/Sparkle.framework"
+# Copy SwiftPM resource bundles (e.g. KeyboardShortcuts) into the app.
+shopt -s nullglob
+for bundle in "$ARM_BUILD_DIR"/*.bundle; do
+    cp -R "$bundle" "$APP_DIR/Contents/Resources/"
+done
+shopt -u nullglob
+
+# Copy Sparkle.framework (if present) into Frameworks.
+SPARKLE_SRC="$ARM_BUILD_DIR/Sparkle.framework"
 if [ -d "$SPARKLE_SRC" ]; then
     cp -R "$SPARKLE_SRC" "$APP_DIR/Contents/Frameworks/"
 
@@ -35,7 +62,6 @@ fi
 
 GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
 BUILD_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-MIN_VER="${MIN_SYSTEM_VERSION:-14.0}"
 
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -65,6 +91,14 @@ chmod +x "$APP_DIR/Contents/MacOS/CopyCopy"
 chmod -R u+w "$APP_DIR"
 xattr -cr "$APP_DIR" 2>/dev/null || true
 find "$APP_DIR" -name '._*' -delete 2>/dev/null || true
+
+# Sign (optional): set APP_IDENTITY to a Developer ID identity string.
+if [[ -n "${APP_IDENTITY:-}" ]]; then
+  codesign --force --deep --timestamp --options runtime --sign "$APP_IDENTITY" "$APP_DIR"
+else
+  # Ad-hoc signing helps diagnostics but won't satisfy Gatekeeper for downloaded apps.
+  codesign --force --deep --sign - "$APP_DIR" >/dev/null 2>&1 || true
+fi
 
 echo ""
 echo "Build complete: dist/CopyCopy.app"

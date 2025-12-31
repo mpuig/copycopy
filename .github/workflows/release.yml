@@ -25,7 +25,12 @@ jobs:
 
       - name: Build release
         run: |
-          swift build -c release
+          # build.sh drives the full packaging (including universal binary)
+          ./build.sh
+
+      - name: Verify app bundle
+        run: |
+          ./scripts/verify_app_bundle.sh
 
       - name: Package app bundle
         id: package
@@ -43,14 +48,9 @@ jobs:
 
           echo "Building version: $TAG"
 
-          # Run build script
-          ./build.sh
-
           # Create zip
           ASSET="CopyCopy-${TAG}-macos.zip"
-          cd dist
-          zip -r "../$ASSET" CopyCopy.app
-          cd ..
+          ditto -c -k --keepParent "dist/CopyCopy.app" "$ASSET"
 
           # Create checksum
           shasum -a 256 "$ASSET" > "$ASSET.sha256"
