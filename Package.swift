@@ -28,6 +28,11 @@ let package = Package(
                 .linkedFramework("SwiftUI"),
                 .linkedFramework("ApplicationServices"),
             ]
+        ),
+        .testTarget(
+            name: "CopyCopyTests",
+            dependencies: ["CopyCopy"],
+            path: "Tests"
         )
     ]
 )

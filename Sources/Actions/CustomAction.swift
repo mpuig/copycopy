@@ -239,26 +239,39 @@ struct CustomAction: Identifiable, Codable, Equatable, Hashable {
         self.isBuiltIn = isBuiltIn
     }
 
-    func processTemplate(with text: String) -> String {
+    func processTemplate(with text: String, shouldEscapeForShell: Bool = false) -> String {
         var result = template
-        result = result.replacingOccurrences(of: "{text}", with: text)
-        result = result.replacingOccurrences(of: "{TEXT}", with: text)
+
+        let textToInsert = shouldEscapeForShell ? escapeForShell(text) : text
+        result = result.replacingOccurrences(of: "{text}", with: textToInsert)
+        result = result.replacingOccurrences(of: "{TEXT}", with: textToInsert)
 
         if let encoded = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
             result = result.replacingOccurrences(of: "{text:encoded}", with: encoded)
             result = result.replacingOccurrences(of: "{TEXT:ENCODED}", with: encoded)
         }
 
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         result = result.replacingOccurrences(of: "{text:trimmed}", with: trimmed)
 
-        let lineCount = text.components(separatedBy: .newlines).count
+        let lineCount = text.components(separatedBy: CharacterSet.newlines).count
         result = result.replacingOccurrences(of: "{linecount}", with: String(lineCount))
 
         let charCount = text.count
         result = result.replacingOccurrences(of: "{charcount}", with: String(charCount))
 
         return result
+    }
+
+    private func escapeForShell(_ text: String) -> String {
+        var escaped = text
+        escaped = escaped.replacingOccurrences(of: "\\", with: "\\\\")
+        escaped = escaped.replacingOccurrences(of: "\"", with: "\\\"")
+        escaped = escaped.replacingOccurrences(of: "$", with: "\\$")
+        escaped = escaped.replacingOccurrences(of: "`", with: "\\`")
+        escaped = escaped.replacingOccurrences(of: "\n", with: "\\n")
+        escaped = escaped.replacingOccurrences(of: "\r", with: "\\r")
+        return "\"\(escaped)\""
     }
 }
 

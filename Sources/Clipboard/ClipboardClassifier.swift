@@ -83,10 +83,13 @@ final class ClipboardClassifier {
         guard let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL] else {
             return nil
         }
-        return urls.first(where: { $0.scheme?.lowercased() != "file" })
+        return urls.first(where: {
+            guard let scheme = $0.scheme?.lowercased() else { return false }
+            return scheme == "http" || scheme == "https"
+        })
     }
 
-    private func detectURL(from text: String) -> URL? {
+    func detectURL(from text: String) -> URL? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
@@ -101,57 +104,69 @@ final class ClipboardClassifier {
             return nil
         }
 
+        guard let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return nil
+        }
+
         return url
     }
 
-    private func detectEntity(from text: String) -> DetectedEntityType {
+    func detectEntity(from text: String) -> DetectedEntityType {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .none }
 
-        // Pattern-based detection (most specific first)
         if let pattern = detectPattern(from: trimmed) {
             return pattern
         }
 
-        // Format detection
         if let format = detectFormat(from: trimmed) {
             return format
         }
 
-        // Use NSDataDetector for phone, date, address, transit
-        let dataDetectorTypes: NSTextCheckingResult.CheckingType = [.phoneNumber, .date, .address, .transitInformation]
-        if let detector = try? NSDataDetector(types: dataDetectorTypes.rawValue) {
-            let range = NSRange(trimmed.startIndex..., in: trimmed)
-            if let match = detector.firstMatch(in: trimmed, options: [], range: range) {
-                let coverage = Double(match.range.length) / Double(range.length)
-                if coverage > 0.6 {
-                    switch match.resultType {
-                    case .phoneNumber:
-                        return .phoneNumber
-                    case .date:
-                        return .date
-                    case .address:
-                        return .address
-                    case .transitInformation:
-                        return .transitInfo
-                    default:
-                        break
-                    }
-                }
-            }
+        if let dataEntity = detectDataDetectorEntity(from: trimmed) {
+            return dataEntity
         }
 
-        // Language detection for foreign text
         if let language = detectForeignLanguage(from: trimmed) {
             return language
         }
 
-        // Use NLTagger for named entities (person, place, organization)
         if let namedEntity = detectNamedEntity(from: trimmed) {
             return namedEntity
         }
 
         return .none
+    }
+
+    private func detectDataDetectorEntity(from text: String) -> DetectedEntityType? {
+        let dataDetectorTypes: NSTextCheckingResult.CheckingType = [.phoneNumber, .date, .address, .transitInformation]
+        guard let detector = try? NSDataDetector(types: dataDetectorTypes.rawValue) else {
+            return nil
+        }
+
+        let range = NSRange(text.startIndex..., in: text)
+        guard let match = detector.firstMatch(in: text, options: [], range: range) else {
+            return nil
+        }
+
+        let coverage = Double(match.range.length) / Double(range.length)
+        guard coverage > 0.6 else {
+            return nil
+        }
+
+        switch match.resultType {
+        case .phoneNumber:
+            return .phoneNumber
+        case .date:
+            return .date
+        case .address:
+            return .address
+        case .transitInformation:
+            return .transitInfo
+        default:
+            return nil
+        }
     }
 
     private func detectPattern(from text: String) -> DetectedEntityType? {
@@ -218,7 +233,7 @@ final class ClipboardClassifier {
         }
 
         // File path (Unix style)
-        let filePathPattern = "^(/[^/\\0]+)+/?$|^~(/[^/\\0]+)*/?$"
+        let filePathPattern = "^(~(/[^/]+)*)/?$|^/([^/]+/)*[^/]+/?$"
         if matches(trimmed, pattern: filePathPattern) {
             return .filePath
         }
@@ -350,4 +365,3 @@ final class ClipboardClassifier {
         return regex.firstMatch(in: text, options: [], range: range) != nil
     }
 }
-

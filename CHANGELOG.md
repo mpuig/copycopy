@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.2 — 2025-12-31
+
+### Fixes
+- Escape inserted clipboard text when running `shellCommand` actions.
+
+### Improvements
+- Expand app-name detection for `openApp` templates (ChatGPT/Claude/Cursor/Copilot).
+- Small refactors in clipboard entity detection and double-copy event tap constants.
+
+### Developer
+- Add SwiftPM test target and initial unit tests.
+
 ## 0.1.0 — Unreleased
 
 Initial release of CopyCopy.

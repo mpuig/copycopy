@@ -21,6 +21,13 @@ final class AppModel: ObservableObject {
     private var pendingShowRequestID: UUID?
     private var cancellables = Set<AnyCancellable>()
 
+    private enum Constants {
+        static let clipboardCaptureDelay1: UInt64 = 80_000_000
+        static let clipboardCaptureDelay2: UInt64 = 200_000_000
+        static let menuTriggerDelay: UInt64 = 120_000_000
+        static let copyEventWindowSeconds: TimeInterval = 1.0
+    }
+
     init(settings: AppSettings, actionsStore: CustomActionsStore) {
         self.settings = settings
         self.actionsStore = actionsStore
@@ -55,7 +62,7 @@ final class AppModel: ObservableObject {
             let snapshot = self.classifier.snapshot(from: .general, changeCount: changeCount)
 
             let now = CACurrentMediaTime()
-            let copyEvent = self.lastCopyKeyEvent.flatMap { (now - $0.timestamp) <= 1.0 ? $0 : nil }
+            let copyEvent = self.lastCopyKeyEvent.flatMap { (now - $0.timestamp) <= Constants.copyEventWindowSeconds ? $0 : nil }
             self.lastClipboardContext = ClipboardContext(copyEvent: copyEvent, snapshot: snapshot, capturedAt: now)
             self.statusText = snapshot.summary
             self.refreshSuggestions()
@@ -101,11 +108,11 @@ final class AppModel: ObservableObject {
 
         Task { @MainActor [weak self] in
             guard let self else { return }
-            try? await Task.sleep(nanoseconds: 80_000_000)
+            try? await Task.sleep(nanoseconds: Constants.clipboardCaptureDelay1)
             guard self.lastTriggerTimestamp == triggerTime else { return }
             self.captureClipboardForTrigger(copyEvent: copyEvent, capturedAt: CACurrentMediaTime())
 
-            try? await Task.sleep(nanoseconds: 200_000_000)
+            try? await Task.sleep(nanoseconds: Constants.clipboardCaptureDelay2)
             guard self.lastTriggerTimestamp == triggerTime else { return }
             self.captureClipboardForTrigger(copyEvent: copyEvent, capturedAt: CACurrentMediaTime())
         }
@@ -119,7 +126,7 @@ final class AppModel: ObservableObject {
 
         Task { @MainActor [weak self] in
             guard let self else { return }
-            try? await Task.sleep(nanoseconds: 120_000_000)
+            try? await Task.sleep(nanoseconds: Constants.menuTriggerDelay)
             guard self.pendingShowRequestID == requestID else {
                 print("[AppModel] Request cancelled (new request came in)")
                 return

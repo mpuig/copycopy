@@ -100,7 +100,8 @@ final class CustomActionsStore: ObservableObject {
 
     func execute(_ action: CustomAction, with context: ClipboardContext) {
         let text = context.snapshot.plainText ?? context.snapshot.url?.absoluteString ?? ""
-        var processedTemplate = action.processTemplate(with: text)
+        let shouldEscape = action.actionType == .shellCommand
+        var processedTemplate = action.processTemplate(with: text, shouldEscapeForShell: shouldEscape)
 
         if let fileURL = context.snapshot.fileURLs?.first {
             processedTemplate = processedTemplate.replacingOccurrences(of: "{path}", with: fileURL.path)
@@ -228,12 +229,23 @@ final class CustomActionsStore: ObservableObject {
     }
 
     private func extractAppName(from template: String) -> String? {
-        if template.lowercased().contains("chatgpt") {
-            return "ChatGPT"
+        let appMappings: [String: String] = [
+            "chatgpt": "ChatGPT",
+            "openai": "ChatGPT",
+            "claude": "Claude",
+            "anthropic": "Claude",
+            "cursor": "Cursor",
+            "copilot": "Copilot"
+        ]
+
+        let lowercaseTemplate = template.lowercased()
+
+        for (keyword, appName) in appMappings {
+            if lowercaseTemplate.contains(keyword) {
+                return appName
+            }
         }
-        if template.lowercased().contains("claude") {
-            return "Claude"
-        }
+
         return nil
     }
 }

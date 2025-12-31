@@ -14,6 +14,10 @@ final class CopyEventTap {
     var onCopyKeyDown: ((CopyKeyEvent) -> Void)?
     var onDoubleCopy: ((CopyKeyEvent) -> Void)?
 
+    private enum Constants {
+        static let cKeyCode: Int64 = 8
+    }
+
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var lastCopyTimestamp: TimeInterval?
@@ -84,8 +88,7 @@ final class CopyEventTap {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         let flags = event.flags
 
-        let cKeyCode: Int64 = 8
-        guard keyCode == cKeyCode else { return }
+        guard keyCode == Constants.cKeyCode else { return }
         guard flags.contains(.maskCommand) else { return }
 
         let now = CACurrentMediaTime()
