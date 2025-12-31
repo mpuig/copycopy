@@ -129,8 +129,12 @@ open /Applications/CopyCopy.app
 
 **Double ⌘C doesn't trigger**
 - Check menu bar icon: if it shows 🔒 (slash), Accessibility isn't granted
-- Go to System Settings → Privacy & Security → Accessibility → enable CopyCopy
+- Go to System Settings → Privacy & Security → Accessibility
+- Click **+** button → Add CopyCopy from /Applications
+- Toggle the switch **ON** next to CopyCopy
+- Click **Allow** if macOS prompts for permission
 - Restart the app after enabling permissions
+- Run `./scripts/diagnose.sh` to check permission status
 
 **Settings window won't open**
 - Press ⌘, when the menu is open to open Settings

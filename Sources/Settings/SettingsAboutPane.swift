@@ -74,7 +74,7 @@ struct SettingsAboutPane: View {
                 AboutLinkRow(
                     icon: "chevron.left.slash.chevron.right",
                     title: "GitHub",
-                    url: "https://github.com/user/CopyCopy")
+                    url: "https://github.com/mpuig/CopyCopy")
             }
             .padding(.top, 8)
             .frame(maxWidth: .infinity)
@@ -118,7 +118,7 @@ struct SettingsAboutPane: View {
     }
 
     private func openProjectHome() {
-        guard let url = URL(string: "https://github.com/user/CopyCopy") else { return }
+        guard let url = URL(string: "https://github.com/mpuig/CopyCopy") else { return }
         NSWorkspace.shared.open(url)
     }
 }
